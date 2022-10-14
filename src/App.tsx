@@ -1,34 +1,38 @@
 import { useEffect, useState } from "react";
 import { Web3Auth } from "@web3auth/web3auth";
-import { CHAIN_NAMESPACES, SafeEventEmitterProvider } from "@web3auth/base";
+import { CHAIN_NAMESPACES } from "@web3auth/base";
 import RPC from "./web3RPC";
+import { Signer } from "@ethersproject/abstract-signer";
 import "./App.css";
-import { client, generateSpecificWalletConnection } from "./utils/WalletConnection";
+import { client, generateSpecificWalletConnection, getWalletBalance } from "./utils/WalletConnection";
+import {Web3Provider} from "@ethersproject/providers"
 
 const clientId = "BFPl1lD-zUhMkA1l9moBsaCVWET-tFVkWDyPbUlcTatNTAyhKzfMpqhqm-7vY2qnbtSfdd1jItBq5aWtdF3IjUE"; // get from https://dashboard.web3auth.io
 
 function App() {
-  const [web3auth, setWeb3auth] = useState<Web3Auth | null>(null);
-  const [provider, setProvider] = useState<SafeEventEmitterProvider | null>(null);
+  const [web3auth, setWeb3auth] = useState<Web3Auth>(
+    new Web3Auth({
+      clientId,
+      chainConfig: {
+        chainNamespace: CHAIN_NAMESPACES.EIP155,
+        chainId: "0x1",
+        rpcTarget: "https://rpc.ankr.com/eth", // This is the public RPC we have added, please pass on your own endpoint while creating an app
+      },
+    })
+  );
+  const [provider, setProvider] = useState<Web3Provider | null>(null);
+  const [signer, setSigner] = useState<Signer | null>(null);
 
   useEffect(() => {
     const init = async () => {
       try {
 
-      const web3auth = new Web3Auth({
-        clientId,
-        chainConfig: {
-          chainNamespace: CHAIN_NAMESPACES.EIP155,
-          chainId: "0x1",
-          rpcTarget: "https://rpc.ankr.com/eth", // This is the public RPC we have added, please pass on your own endpoint while creating an app
-        },
-      });
-
-      setWeb3auth(web3auth);
-
       await web3auth.initModal();
         if (web3auth.provider) {
-          setProvider(web3auth.provider);
+          const provider = new Web3Provider (web3auth.provider)
+          if (provider == null) return;
+          setProvider(provider);
+          setSigner(provider.getSigner());
         };
       } catch (error) {
         console.error(error);
@@ -44,7 +48,12 @@ function App() {
       return;
     }
     const web3authProvider = await web3auth.connect();
-    setProvider(web3authProvider);
+    if (web3authProvider == null) return;
+    const provider = new Web3Provider (web3authProvider)
+    if (!provider) return;
+    setProvider(provider);
+    setSigner(provider.getSigner());
+    
   };
 
   const getUserInfo = async () => {
@@ -68,28 +77,44 @@ function App() {
 
   // Checks that the user is registered.
   async function checkUserRegistration(address: string): Promise<boolean> {
-    const user = await client.getUser(address);
-    if (user.accounts.length == 0) {
-      // IMX returns an empty array if there are no registered accounts for the wallet
-      return false;
-    } else {
-      return true;
+    try {
+      const user = await client.getUser(address);
+      return Boolean(user.accounts.length) 
     }
+    catch (error)
+    {
+      console.error(JSON.stringify(error, null, 2));
+      return false;
+    }
+    
   }
 
-  const registerWithIMX = async () => {
+  const checkIMXBalance = async () => {
+    if (!provider) {
+      console.log("provider not initialized yet");
+      return;
+    }
+    try {const balance = await getWalletBalance(provider.getSigner());
+      console.log(balance.toString);
+    } catch (error) {
+      throw new Error(JSON.stringify(error, null, 4));
+    }
+  };
+
+  const connectWithIMX = async () => {
     if (!provider) {
       console.log("provider not initialized yet");
       return;
     }
     try {
-      const rpc = new RPC(provider);
-      const privateKey = await rpc.getPrivateKey()
-      const walletConnection = await generateSpecificWalletConnection(privateKey);
+     
+      //fetch the web3auth using ethers web3 provider
+      const walletConnection = await generateSpecificWalletConnection(provider.getSigner());
       const address = await walletConnection.ethSigner.getAddress();
       const isRegistered = await checkUserRegistration(address);
       console.log(isRegistered);
       if (!isRegistered) {
+        console.log ('Registering new user')
         await client.registerOffchain(walletConnection);
       }
     } catch (error) {
@@ -104,6 +129,7 @@ function App() {
     }
     await web3auth.logout();
     setProvider(null);
+    setSigner(null);
   };
 
   const getChainId = async () => {
@@ -111,8 +137,7 @@ function App() {
       console.log("provider not initialized yet");
       return;
     }
-    const rpc = new RPC(provider);
-    const chainId = await rpc.getChainId();
+    const chainId = await provider?.getNetwork();
     console.log(chainId);
   };
   const getAccounts = async () => {
@@ -191,8 +216,11 @@ function App() {
       <button onClick={getPrivateKey} className="card">
         Get Private Key
       </button>
-      <button onClick={registerWithIMX} className="card">
-        Register with IMX
+      <button onClick={connectWithIMX} className="card">
+        Connect with IMX
+      </button>
+      <button onClick={checkIMXBalance} className="card">
+        Get IMX Balance
       </button>
       <button onClick={logout} className="card">
         Log Out
