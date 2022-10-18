@@ -6,7 +6,7 @@ import { Signer } from "@ethersproject/abstract-signer";
 import "./App.css";
 import { client, createTransfer, generateSpecificWalletConnection, getWalletBalance } from "./utils/WalletConnection";
 import {Web3Provider} from "@ethersproject/providers"
-import {utils} from "web3";
+//import {Web3} from "web3";
 
 const clientId = "BFPl1lD-zUhMkA1l9moBsaCVWET-tFVkWDyPbUlcTatNTAyhKzfMpqhqm-7vY2qnbtSfdd1jItBq5aWtdF3IjUE"; // get from https://dashboard.web3auth.io
 
@@ -103,14 +103,14 @@ function App() {
   };
 
   const connectWithIMX = async () => {
-    if (!provider) {
+    if (!signer) {
       console.log("provider not initialized yet");
       return;
     }
     try {
      
       //fetch the web3auth using ethers web3 provider
-      const walletConnection = await generateSpecificWalletConnection(provider.getSigner());
+      const walletConnection = await generateSpecificWalletConnection(signer);
       const address = await walletConnection.ethSigner.getAddress();
       const isRegistered = await checkUserRegistration(address);
       console.log(isRegistered);
@@ -124,14 +124,14 @@ function App() {
   };
 
   const doERC721Transfer = async () => {
-    if (!provider) {
+    if (!signer) {
       console.log("provider not initialized yet");
       return;
     }
     try {
      
       //check if target wallet has been registered
-      const walletConnection = await generateSpecificWalletConnection(provider.getSigner());
+      const walletConnection = await generateSpecificWalletConnection(signer);
       const address = await walletConnection.ethSigner.getAddress();
       const isRegistered = await checkUserRegistration(address);
       console.log(isRegistered);
@@ -140,7 +140,7 @@ function App() {
         await client.registerOffchain(walletConnection);
       }
 
-      const walletConnection2 = await generateSpecificWalletConnection(provider.getSigner());
+      const walletConnection2 = await generateSpecificWalletConnection(signer);
       const balance = await createTransfer(walletConnection2, '1', '1','address');
       console.log(JSON.stringify(balance, null, 4));
 
@@ -177,11 +177,11 @@ function App() {
   };
 
   const getBalance = async () => {
-    if (!provider) {
+    if (!signer) {
       console.log("provider not initialized yet");
       return;
     }
-    const balance = await provider?.getBalance(provider?.getSigner().getAddress());
+    const balance = await provider?.getBalance(signer.getAddress());
     console.log(balance);
   };
 
@@ -192,10 +192,10 @@ function App() {
     }
     const destination = signer.getAddress();
 
-    const amount = utils.toWei("0.001"); // Convert 1 ether to wei
+    //const amount = Web3.utils.toWei("0.001"); // Convert 1 ether to wei
 
     // Submit transaction to the blockchain and wait for it to be mined
-    const receipt = await signer.sendTransaction({
+    /**const receipt = await signer.sendTransaction({
       from: signer.getAddress(),
       to: destination,
       value: amount,
@@ -203,6 +203,7 @@ function App() {
       maxFeePerGas: "6000000000000", // Max fee per gas
     });
     console.log(receipt);
+    **/
   };
 
   const signMessage = async () => {
