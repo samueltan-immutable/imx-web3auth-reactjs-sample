@@ -5,6 +5,7 @@ import {
   ImmutableX,
   Config,
   BalancesApiGetBalanceRequest,
+  UnsignedTransferRequest,
   createStarkSigner,
   generateStarkPrivateKey,
   WalletConnection,
@@ -13,9 +14,6 @@ import {
     generateStarkWallet,
     BaseSigner
   } from "@imtbl/core-sdk-old";
-//import { getEnv } from "./getEnv";
-//import * as dotenv from 'dotenv'
-//dotenv.config()
 
 // select which environment you want to work in
 const config = Config.SANDBOX; // Or PRODUCTION
@@ -57,5 +55,19 @@ export async function getWalletBalance (ethSigner:Signer) {
     address: 'ETH'
   }
   return client.getBalance(balanceAPIRequest) 
+
+  }
+
+
+export async function createTransfer (walletConnect:WalletConnection, tokenId:string, tokenAddress:string, transferTo:string) {
+  // Get details of a signable transfer
+  const transferRequest: UnsignedTransferRequest = {
+    receiver: transferTo,
+    type: 'ERC721',
+    tokenId: tokenId,
+    tokenAddress: tokenAddress
+  } 
+
+  return client.transfer(walletConnect, transferRequest)
 
   }
