@@ -4,11 +4,18 @@ import { CHAIN_NAMESPACES } from "@web3auth/base";
 import RPC from "./web3RPC";
 import { Signer } from "@ethersproject/abstract-signer";
 import "./App.css";
-import { client, createTransfer, generateSpecificWalletConnection, getWalletBalance } from "./utils/WalletConnection";
+import { client, createERC721Transfer, generateSpecificWalletConnection, getWalletBalance, sellERC721ForETH, buyOrder } from "./utils/WalletConnection";
 import {Web3Provider} from "@ethersproject/providers"
 //import {Web3} from "web3";
 
 const clientId = "BFPl1lD-zUhMkA1l9moBsaCVWET-tFVkWDyPbUlcTatNTAyhKzfMpqhqm-7vY2qnbtSfdd1jItBq5aWtdF3IjUE"; // get from https://dashboard.web3auth.io
+
+//For Mainnet
+/* chainConfig: {
+  chainNamespace: CHAIN_NAMESPACES.EIP155,
+  chainId: "0x1",
+  rpcTarget: "https://rpc.ankr.com/eth", // This is the public RPC we have added, please pass on your own endpoint while creating an app
+}, */
 
 function App() {
   const [web3auth, setWeb3auth] = useState<Web3Auth>(
@@ -16,11 +23,15 @@ function App() {
       clientId,
       chainConfig: {
         chainNamespace: CHAIN_NAMESPACES.EIP155,
-        chainId: "0x1",
-        rpcTarget: "https://rpc.ankr.com/eth", // This is the public RPC we have added, please pass on your own endpoint while creating an app
+        chainId: "0x5",
+        displayName: "Goerli Testnet",
+        blockExplorer:"https://goerli.etherscan.io",
+        rpcTarget: "https://rpc.ankr.com/eth_goerli", // This is the public RPC we have added, please pass on your own endpoint while creating an app
       },
     })
   );
+
+
   const [provider, setProvider] = useState<Web3Provider | null>(null);
   const [signer, setSigner] = useState<Signer | null>(null);
 
@@ -141,11 +152,63 @@ function App() {
       }
 
       const walletConnection2 = await generateSpecificWalletConnection(signer);
-      const balance = await createTransfer(walletConnection2, '1', '1','address');
+      const result = await createERC721Transfer(walletConnection2, '328', '0x7510f4d7bcaa8639c0f21b938662071c2df38c73','0x6eBFe2b6Be48fF4f2011EbE4d9A63a65D25f40C0');
+      console.log(JSON.stringify(result, null, 4));
+
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const doBuyOrder = async () => {
+    if (!signer) {
+      console.log("provider not initialized yet");
+      return;
+    }
+    try {
+     
+      //check if target wallet has been registered
+      const walletConnection = await generateSpecificWalletConnection(signer);
+      const address = await walletConnection.ethSigner.getAddress();
+      const isRegistered = await checkUserRegistration(address);
+      console.log(isRegistered);
+      if (!isRegistered) {
+        console.log ('Registering new user')
+        await client.registerOffchain(walletConnection);
+      }
+
+      const result = await buyOrder(walletConnection, 328);
+      console.log(JSON.stringify(result, null, 4));
+
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+
+  const doSellERC721forETH = async () => {
+    if (!signer) {
+      console.log("provider not initialized yet");
+      return;
+    }
+    try {
+     
+      //check if target wallet has been registered
+      const walletConnection = await generateSpecificWalletConnection(signer);
+      const address = await walletConnection.ethSigner.getAddress();
+      const isRegistered = await checkUserRegistration(address);
+      console.log(isRegistered);
+      if (!isRegistered) {
+        console.log ('Registering new user')
+        await client.registerOffchain(walletConnection);
+      }
+
+      const walletConnection2 = await generateSpecificWalletConnection(signer);
+      const balance = await sellERC721ForETH(walletConnection2, '328', '0x7510f4d7bcaa8639c0f21b938662071c2df38c73', '1000000000000');
       console.log(JSON.stringify(balance, null, 4));
 
     } catch (error) {
-      throw new Error(JSON.stringify(error, null, 4));
+      console.error(error);
     }
   };
 
@@ -228,6 +291,7 @@ function App() {
     const privateKey = await rpc.getPrivateKey();
     console.log(privateKey);
   };
+
   const loggedInView = (
     <>
       <button onClick={getUserInfo} className="card">
@@ -263,6 +327,12 @@ function App() {
       </button>
       <button onClick={doERC721Transfer} className="card">
         Transfer ERC721
+      </button>
+      <button onClick={doSellERC721forETH} className="card">
+        Sell ERC721 for ETH
+      </button>
+      <button onClick={doBuyOrder} className="card">
+        Buy OrderID
       </button>
       <button onClick={logout} className="card">
         Log Out

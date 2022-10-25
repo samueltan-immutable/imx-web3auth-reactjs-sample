@@ -6,8 +6,10 @@ import {
   Config,
   BalancesApiGetBalanceRequest,
   UnsignedTransferRequest,
+  UnsignedOrderRequest,
   createStarkSigner,
   generateStarkPrivateKey,
+  GetSignableTradeRequest,
   WalletConnection,
 } from "@imtbl/core-sdk";
 import {
@@ -55,19 +57,83 @@ export async function getWalletBalance (ethSigner:Signer) {
     address: 'ETH'
   }
   return client.getBalance(balanceAPIRequest) 
-
   }
 
 
-export async function createTransfer (walletConnect:WalletConnection, tokenId:string, tokenAddress:string, transferTo:string) {
+export async function createERC721Transfer (walletConnect:WalletConnection, tokenId:string, tokenAddress:string, transferTo:string) {
   // Get details of a signable transfer
   const transferRequest: UnsignedTransferRequest = {
-    receiver: transferTo,
+    receiver: transferTo.toLowerCase(),
     type: 'ERC721',
     tokenId: tokenId,
-    tokenAddress: tokenAddress
+    tokenAddress: tokenAddress.toLowerCase()
   } 
-
   return client.transfer(walletConnect, transferRequest)
-
   }
+
+  export async function createERC20Transfer (walletConnect:WalletConnection, amount:string, tokenAddress:string, transferTo:string) {
+    // Get details of a signable transfer
+    const transferRequest: UnsignedTransferRequest = {
+      receiver: transferTo.toLowerCase(),
+      type: 'ERC20',
+      amount: amount,
+      tokenAddress: tokenAddress.toLowerCase()
+    } 
+    return client.transfer(walletConnect, transferRequest)
+    }
+
+  export async function sellERC721ForETH (walletConnect:WalletConnection, tokenId:string, tokenAddress:string, amount:string) {
+    const orderRequest: UnsignedOrderRequest = {
+      sell: {
+        // We are listing our NFT for Sale, so it is an ERC721 on the sell side
+        type: "ERC721",
+        tokenId: tokenId,
+        tokenAddress: tokenAddress,
+      },
+      buy: {
+        // To sell the NFT, we "buying" this amount of ETH - so amount we want for the NFT is on the buy side
+        type: "ETH",
+        amount: amount, // this is a quantised value
+      },
+    };
+    
+     return client.createOrder(walletConnect, orderRequest)
+      .then((id) => {
+        console.log(`Sell order created, id: ${id.order_id}`); // you'll need this ID to complete a trade later.
+      })
+      .catch((err) => {
+        throw err;
+      });
+    
+      }
+
+      export async function buyOrder (walletConnect:WalletConnection, orderId:number) {
+        const tradeRequest: GetSignableTradeRequest = {
+          order_id: orderId,
+          user: (await walletConnect.ethSigner.getAddress()).toString(),
+        };
+        
+        client.createTrade(walletConnect, tradeRequest)
+          .then((id) => {
+            console.log(`Trade created, id: ${id.trade_id}`);
+          })
+          .catch((err) => {
+            throw err;
+          });
+        
+          }
+
+      
+
+  export async function createDeposit (walletConnect:WalletConnection, tokenId:string, tokenAddress:string, transferTo:string) {
+    // Get details of a signable transfer
+    const transferRequest: UnsignedTransferRequest = {
+      receiver: transferTo.toLowerCase(),
+      type: 'ERC721',
+      tokenId: tokenId,
+      tokenAddress: tokenAddress.toLowerCase()
+    } 
+    return client.transfer(walletConnect, transferRequest)
+  
+    }
+
