@@ -4,7 +4,7 @@ import { CHAIN_NAMESPACES } from "@web3auth/base";
 import RPC from "./web3RPC";
 import { Signer } from "@ethersproject/abstract-signer";
 import "./App.css";
-import { client, createERC721Transfer, generateSpecificWalletConnection, getWalletBalance, sellERC721ForETH, buyOrder } from "./utils/WalletConnection";
+import { client, createERC721Transfer, getAssets, generateSpecificWalletConnection, getWalletBalance, sellERC721ForETH, buyOrder } from "./utils/WalletConnection";
 import {Web3Provider} from "@ethersproject/providers"
 //import {Web3} from "web3";
 
@@ -212,6 +212,25 @@ function App() {
     }
   };
 
+  const getAssetsIOwn = async () => {
+    if (!signer) {
+      console.log("provider not initialized yet");
+      return;
+    }
+    try {
+     
+      //check if target wallet has been registered
+      const walletConnection = await generateSpecificWalletConnection(signer);
+      const address = await walletConnection.ethSigner.getAddress();
+
+      const balance = await getAssets(address);
+      console.log(JSON.stringify(balance, null, 4));
+
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
   const logout = async () => {
     if (!web3auth) {
       console.log("web3auth not initialized yet");
@@ -324,6 +343,9 @@ function App() {
       </button>
       <button onClick={checkIMXBalance} className="card">
         Get IMX Balance
+      </button>
+      <button onClick={getAssetsIOwn} className="card">
+        Get IMX Assets
       </button>
       <button onClick={doERC721Transfer} className="card">
         Transfer ERC721

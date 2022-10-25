@@ -5,6 +5,7 @@ import {
   ImmutableX,
   Config,
   BalancesApiGetBalanceRequest,
+  AssetsApiListAssetsRequest,
   UnsignedTransferRequest,
   UnsignedOrderRequest,
   createStarkSigner,
@@ -58,6 +59,14 @@ export async function getWalletBalance (ethSigner:Signer) {
   }
   return client.getBalance(balanceAPIRequest) 
   }
+
+export async function getAssets (wallet:string) {
+    // Get balance of 
+    const assetAPIRequest: AssetsApiListAssetsRequest = {
+      user:wallet
+    }
+    return client.listAssets(assetAPIRequest) 
+    }
 
 
 export async function createERC721Transfer (walletConnect:WalletConnection, tokenId:string, tokenAddress:string, transferTo:string) {
