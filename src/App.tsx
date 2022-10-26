@@ -1,11 +1,10 @@
 import { useEffect, useState } from "react";
 import { Web3Auth } from "@web3auth/web3auth";
-import { CHAIN_NAMESPACES } from "@web3auth/base";
+import { CHAIN_NAMESPACES, SafeEventEmitterProvider } from "@web3auth/base";
 import RPC from "./web3RPC";
-import { Signer } from "@ethersproject/abstract-signer";
 import "./App.css";
-import { client, createERC721Transfer, getAssets, generateSpecificWalletConnection, getWalletBalance, sellERC721ForETH, buyOrder } from "./utils/WalletConnection";
-import {Web3Provider} from "@ethersproject/providers"
+import { Wallet, needToRegister, createERC721Transfer, getAssets, createETHDeposit, generateSpecificWalletConnection, getWalletBalance, sellERC721ForETH, buyOrder } from "./utils/WalletConnection";
+import { Web3Provider } from "@ethersproject/providers"
 //import {Web3} from "web3";
 
 const clientId = "BFPl1lD-zUhMkA1l9moBsaCVWET-tFVkWDyPbUlcTatNTAyhKzfMpqhqm-7vY2qnbtSfdd1jItBq5aWtdF3IjUE"; // get from https://dashboard.web3auth.io
@@ -25,27 +24,39 @@ function App() {
         chainNamespace: CHAIN_NAMESPACES.EIP155,
         chainId: "0x5",
         displayName: "Goerli Testnet",
-        blockExplorer:"https://goerli.etherscan.io",
+        blockExplorer: "https://goerli.etherscan.io",
         rpcTarget: "https://rpc.ankr.com/eth_goerli", // This is the public RPC we have added, please pass on your own endpoint while creating an app
       },
     })
   );
 
+  const [wallet, setWalletState] = useState<Wallet | null>(null);
 
-  const [provider, setProvider] = useState<Web3Provider | null>(null);
-  const [signer, setSigner] = useState<Signer | null>(null);
+  const setCurrentWallet = async (web3AuthProvider: SafeEventEmitterProvider | null) => {
+    if (web3AuthProvider === null) {
+      setWalletState(null);
+      return;
+    }
+    const provider = new Web3Provider(web3AuthProvider)
+    const signer = provider.getSigner()
+    const address = (await signer.getAddress()).toLowerCase()
+    const walletConnection = await generateSpecificWalletConnection(signer)
+
+    setWalletState({
+      signer,
+      provider,
+      walletConnection,
+      address
+    });
+
+  }
 
   useEffect(() => {
     const init = async () => {
       try {
-
-      await web3auth.initModal();
-        if (web3auth.provider) {
-          const provider = new Web3Provider (web3auth.provider)
-          if (provider == null) return;
-          setProvider(provider);
-          setSigner(provider.getSigner());
-        };
+        await web3auth.initModal();
+        if (web3auth.provider) return "No Valid Web3 Provider"
+        await setCurrentWallet(web3auth.provider)
       } catch (error) {
         console.error(error);
       }
@@ -54,6 +65,7 @@ function App() {
     init();
   }, []);
 
+  //login user wallet
   const login = async () => {
     if (!web3auth) {
       console.log("web3auth not initialized yet");
@@ -61,13 +73,11 @@ function App() {
     }
     const web3authProvider = await web3auth.connect();
     if (web3authProvider == null) return;
-    const provider = new Web3Provider (web3authProvider)
-    if (!provider) return;
-    setProvider(provider);
-    setSigner(provider.getSigner());
-    
+    setCurrentWallet(web3authProvider);
+
   };
 
+  //get web3auth user info
   const getUserInfo = async () => {
     if (!web3auth) {
       console.log("web3auth not initialized yet");
@@ -77,7 +87,7 @@ function App() {
     console.log(user);
   };
 
-
+  //get Web3auth token details
   const getidToken = async () => {
     if (!web3auth) {
       console.log("web3auth not initialized yet");
@@ -86,73 +96,49 @@ function App() {
     const idToken = await web3auth.authenticateUser();
     console.log(idToken);
   };
-
-  // Checks that the user is registered.
-  async function checkUserRegistration(address: string): Promise<boolean> {
-    try {
-      const user = await client.getUser(address);
-      return Boolean(user.accounts.length) 
-    }
-    catch (error)
-    {
-      console.error(JSON.stringify(error, null, 2));
-      return false;
-    }
-    
-  }
-
+  
+  //Get IMX ETH balance of wallet
   const checkIMXBalance = async () => {
-    if (!provider) {
-      console.log("provider not initialized yet");
+    if (!wallet) {
+      console.log("Wallet not initialized yet");
       return;
     }
-    try {const balance = await getWalletBalance(provider.getSigner());
+    try {
+      const balance = await getWalletBalance(wallet);
       console.log(JSON.stringify(balance, null, 4));
     } catch (error) {
       throw new Error(JSON.stringify(error, null, 4));
     }
   };
 
+  //Make sure the wallet is registered with IMX
   const connectWithIMX = async () => {
-    if (!signer) {
-      console.log("provider not initialized yet");
+    if (!wallet) {
+      console.log("Wallet not initialized yet");
       return;
     }
     try {
-     
-      //fetch the web3auth using ethers web3 provider
-      const walletConnection = await generateSpecificWalletConnection(signer);
-      const address = await walletConnection.ethSigner.getAddress();
-      const isRegistered = await checkUserRegistration(address);
-      console.log(isRegistered);
-      if (!isRegistered) {
-        console.log ('Registering new user')
-        await client.registerOffchain(walletConnection);
-      }
+      const result = needToRegister(wallet)
+      console.log(result)
     } catch (error) {
       throw new Error(JSON.stringify(error, null, 4));
     }
   };
 
+  //Transfer an ERC721 from users wallet to a target wallet
   const doERC721Transfer = async () => {
-    if (!signer) {
-      console.log("provider not initialized yet");
+    if (!wallet) {
+      console.log("Wallet not initialized yet");
       return;
     }
     try {
-     
       //check if target wallet has been registered
-      const walletConnection = await generateSpecificWalletConnection(signer);
-      const address = await walletConnection.ethSigner.getAddress();
-      const isRegistered = await checkUserRegistration(address);
-      console.log(isRegistered);
-      if (!isRegistered) {
-        console.log ('Registering new user')
-        await client.registerOffchain(walletConnection);
-      }
+      needToRegister(wallet)
 
-      const walletConnection2 = await generateSpecificWalletConnection(signer);
-      const result = await createERC721Transfer(walletConnection2, '328', '0x7510f4d7bcaa8639c0f21b938662071c2df38c73','0x6eBFe2b6Be48fF4f2011EbE4d9A63a65D25f40C0');
+      const target_wallet = '0xF6372939CE2d14A68A629B8E4785E9dCB4EdA0cf'
+      const token_address_for_sale = '0x7510f4d7bcaa8639c0f21b938662071c2df38c73';
+      const token_id_for_sale = '328';
+      const result = await createERC721Transfer(wallet, token_id_for_sale, token_address_for_sale, target_wallet);
       console.log(JSON.stringify(result, null, 4));
 
     } catch (error) {
@@ -160,24 +146,38 @@ function App() {
     }
   };
 
+  //Buy a specific IMX Order_ID
   const doBuyOrder = async () => {
-    if (!signer) {
-      console.log("provider not initialized yet");
+    if (!wallet) {
+      console.log("Wallet not initialized yet");
       return;
     }
     try {
-     
-      //check if target wallet has been registered
-      const walletConnection = await generateSpecificWalletConnection(signer);
-      const address = await walletConnection.ethSigner.getAddress();
-      const isRegistered = await checkUserRegistration(address);
-      console.log(isRegistered);
-      if (!isRegistered) {
-        console.log ('Registering new user')
-        await client.registerOffchain(walletConnection);
-      }
+      //make sure wallet is registered before doing something
+      needToRegister(wallet)
+      const order_id_to_buy = 328;
+      const result = await buyOrder(wallet, order_id_to_buy);
+      console.log(JSON.stringify(result, null, 4));
+    } catch (error) {
+      console.error(error);
+    }
+  };
 
-      const result = await buyOrder(walletConnection, 328);
+  //Sell IMX ERC721 for ETH
+  const doSellERC721forETH = async () => {
+    if (!wallet) {
+      console.log("Wallet not initialized yet");
+      return;
+    }
+    try {
+      //make sure wallet is registered before doing something
+      needToRegister(wallet)
+
+      const token_address_for_sale = '0x7510f4d7bcaa8639c0f21b938662071c2df38c73';
+      const token_id_for_sale = '152';
+      //amount is quantized - 
+      const amount_eth_for_sale = '10000000000000000'
+      const result = await sellERC721ForETH(wallet, token_id_for_sale, token_address_for_sale, amount_eth_for_sale);
       console.log(JSON.stringify(result, null, 4));
 
     } catch (error) {
@@ -185,45 +185,14 @@ function App() {
     }
   };
 
-
-  const doSellERC721forETH = async () => {
-    if (!signer) {
-      console.log("provider not initialized yet");
-      return;
-    }
-    try {
-     
-      //check if target wallet has been registered
-      const walletConnection = await generateSpecificWalletConnection(signer);
-      const address = await walletConnection.ethSigner.getAddress();
-      const isRegistered = await checkUserRegistration(address);
-      console.log(isRegistered);
-      if (!isRegistered) {
-        console.log ('Registering new user')
-        await client.registerOffchain(walletConnection);
-      }
-
-      const walletConnection2 = await generateSpecificWalletConnection(signer);
-      const balance = await sellERC721ForETH(walletConnection2, '328', '0x7510f4d7bcaa8639c0f21b938662071c2df38c73', '1000000000000');
-      console.log(JSON.stringify(balance, null, 4));
-
-    } catch (error) {
-      console.error(error);
-    }
-  };
-
+  //Write to console all asset in a wallet
   const getAssetsIOwn = async () => {
-    if (!signer) {
-      console.log("provider not initialized yet");
+    if (!wallet) {
+      console.log("Wallet not initialized yet");
       return;
     }
     try {
-     
-      //check if target wallet has been registered
-      const walletConnection = await generateSpecificWalletConnection(signer);
-      const address = await walletConnection.ethSigner.getAddress();
-
-      const balance = await getAssets(address);
+      const balance = await getAssets(wallet.address);
       console.log(JSON.stringify(balance, null, 4));
 
     } catch (error) {
@@ -231,76 +200,78 @@ function App() {
     }
   };
 
+  //Deposit 0.01 ETH to IMX
+  const depositETHtoIMX = async () => {
+    if (!wallet) {
+      console.log("Wallet not initialized yet");
+      return;
+    }
+    try {
+      //make sure wallet is registered before doing something
+      needToRegister(wallet)
+      const amount_to_deposit = '100000000000000000'
+      const result = await createETHDeposit(wallet, amount_to_deposit);
+      console.log(JSON.stringify(result, null, 4));
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  //Logout current wallet
   const logout = async () => {
     if (!web3auth) {
       console.log("web3auth not initialized yet");
       return;
     }
     await web3auth.logout();
-    setProvider(null);
-    setSigner(null);
+    setWalletState(null);
   };
 
+  //get chain information for wallet
   const getChainId = async () => {
-    if (!provider) {
-      console.log("provider not initialized yet");
+    if (!wallet) {
+      console.log("Wallet not initialized yet");
       return;
     }
-    const chainId = await provider?.getNetwork();
+    const chainId = await wallet.provider?.getNetwork();
     console.log(chainId);
   };
+
+  //get L1 wallet addresses
   const getAccounts = async () => {
-    if (!provider) {
-      console.log("provider not initialized yet");
+    if (!wallet) {
+      console.log("Wallet not initialized yet");
       return;
     }
-    const address = await provider?.listAccounts();
+    const address = await wallet.provider?.listAccounts();
     console.log(address);
   };
 
+  //get L1 balance of wallet
   const getBalance = async () => {
-    if (!signer) {
-      console.log("provider not initialized yet");
+    if (!wallet) {
+      console.log("Wallet not initialized yet");
       return;
     }
-    const balance = await provider?.getBalance(signer.getAddress());
+    const balance = await wallet.provider?.getBalance(wallet?.address);
     console.log(balance);
   };
 
-  const sendTransaction = async () => {
-    if (!signer) {
-      console.log("provider not initialized yet");
-      return;
-    }
-    const destination = signer.getAddress();
-
-    //const amount = Web3.utils.toWei("0.001"); // Convert 1 ether to wei
-
-    // Submit transaction to the blockchain and wait for it to be mined
-    /**const receipt = await signer.sendTransaction({
-      from: signer.getAddress(),
-      to: destination,
-      value: amount,
-      maxPriorityFeePerGas: "5000000000", // Max priority fee per gas
-      maxFeePerGas: "6000000000000", // Max fee per gas
-    });
-    console.log(receipt);
-    **/
-  };
-
+  //sign a specific message using wallet
   const signMessage = async () => {
-    if (!provider) {
-      console.log("provider not initialized yet");
+    if (!wallet) {
+      console.log("Wallet not initialized yet");
       return;
     }
 
     const originalMessage = "YOUR_MESSAGE";
 
     // Sign the message
-    const signedMessage = await provider?.getSigner().signMessage(originalMessage)
+    const signedMessage = await wallet?.signer.signMessage(originalMessage)
     console.log(signedMessage);
   };
 
+  //get private key if available
   const getPrivateKey = async () => {
     if (!web3auth.provider) {
       console.log("provider not initialized yet");
@@ -316,7 +287,6 @@ function App() {
       <button onClick={getUserInfo} className="card">
         Get User Info
       </button>
-
       <button onClick={getidToken} className="card">
         Get ID Token
       </button>
@@ -328,9 +298,6 @@ function App() {
       </button>
       <button onClick={getBalance} className="card">
         Get Balance
-      </button>
-      <button onClick={sendTransaction} className="card">
-        Send Transaction
       </button>
       <button onClick={signMessage} className="card">
         Sign Message
@@ -346,6 +313,9 @@ function App() {
       </button>
       <button onClick={getAssetsIOwn} className="card">
         Get IMX Assets
+      </button>
+      <button onClick={depositETHtoIMX} className="card">
+        Deposit 0.01 ETH to IMX
       </button>
       <button onClick={doERC721Transfer} className="card">
         Transfer ERC721
@@ -378,13 +348,19 @@ function App() {
         <a target="_blank" href="http://web3auth.io/" rel="noreferrer">
           Web3Auth
         </a>
-        & ReactJS Example
+        <a target="_blank" href="https://docs.x.immutable.com/" rel="noreferrer">
+          + IMX
+        </a>
+        <a target="_blank" href="https://reactjs.org/" rel="noreferrer">
+         + ReactJS Example
+        </a>
+         
       </h1>
 
-      <div className="grid">{provider ? loggedInView : unloggedInView}</div>
+      <div className="grid">{wallet ? loggedInView : unloggedInView}</div>
 
       <footer className="footer">
-        <a href="https://github.com/Web3Auth/Web3Auth/tree/master/examples/react-app" target="_blank" rel="noopener noreferrer">
+        <a href="https://github.com/samueltan-immutable/web3auth-test" target="_blank" rel="noopener noreferrer">
           Source code
         </a>
       </footer>
