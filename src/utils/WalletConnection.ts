@@ -45,15 +45,17 @@ export async function generateSpecificWalletConnection(ethSigner: Signer) {
 //check if user wallet has been registered on IMX and if not setup on IMX
 export async function needToRegister(wallet: Wallet) {
   try {
-    const isRegistered = await client.getUser(wallet.address);
-    if (!isRegistered) {
-      await client.registerOffchain(wallet.walletConnection);
-      return true
-    } else {
-      return false
-    }
-  } catch (error) {
-    throw new Error('Error in user registration');
+    await client.getUser(wallet.address);
+    console.log("User is already registered")
+  } catch(e) {
+      console.log(e);
+      try {
+        console.log('User is unregistered. Need to register user.')
+        await client.registerOffchain(wallet.walletConnection);
+        console.log("User has successfully been registered")
+      } catch {
+        throw new Error('Error in user registration');
+      }
   }
 }
 
