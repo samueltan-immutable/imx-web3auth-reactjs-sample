@@ -8,6 +8,7 @@ import {
   UnsignedOrderRequest,
   GetSignableTradeRequest,
   WalletConnection,
+  IMXError
 } from "@imtbl/core-sdk";
 import {
   generateStarkWallet,
@@ -45,15 +46,23 @@ export async function generateSpecificWalletConnection(ethSigner: Signer) {
 //check if user wallet has been registered on IMX and if not setup on IMX
 export async function needToRegister(wallet: Wallet) {
   try {
-    const isRegistered = await client.getUser(wallet.address);
-    if (!isRegistered) {
-      await client.registerOffchain(wallet.walletConnection);
-      return true
-    } else {
-      return false
+    let user = await client.getUser(wallet.address);
+    if (user.accounts.length) {
+      console.log("User is already registered")
     }
-  } catch (error) {
-    throw new Error('Error in user registration');
+  } catch(e) {
+      console.error(e);
+      if (e instanceof IMXError) {
+        try {
+          console.log("User not registered. Need to register user")
+          await client.registerOffchain(wallet.walletConnection);
+          console.log("User has successfully been registered")
+        } catch {
+          throw new Error('Error in registerOffchain');
+        }
+      } else {
+        throw new Error('Error in user registration')
+      }
   }
 }
 
