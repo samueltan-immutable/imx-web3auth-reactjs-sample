@@ -3,11 +3,27 @@ import { Web3Auth } from "@web3auth/web3auth";
 import { CHAIN_NAMESPACES, SafeEventEmitterProvider } from "@web3auth/base";
 import RPC from "./web3RPC";
 import "./App.css";
-import { Wallet, needToRegister, createERC721Transfer, getAssets, createETHDeposit, generateSpecificWalletConnection, getWalletBalance, sellERC721ForETH, buyOrder } from "./utils/WalletConnection";
-import { Web3Provider } from "@ethersproject/providers"
+import {
+  Wallet,
+  needToRegister,
+  createERC721Transfer,
+  getAssets,
+  createETHDeposit,
+  generateSpecificWalletConnection,
+  getWalletBalance,
+  sellERC721ForETH,
+  buyOrder,
+} from "./utils/WalletConnection";
+import { Web3Provider } from "@ethersproject/providers";
 //import {Web3} from "web3";
+import { useModal } from "./useModal";
+import { Modal } from "./modal/modal";
+import React from "react";
+import SyntaxHighlighter from "react-syntax-highlighter";
+import { github } from "react-syntax-highlighter/dist/esm/styles/hljs";
 
-const clientId = "BFPl1lD-zUhMkA1l9moBsaCVWET-tFVkWDyPbUlcTatNTAyhKzfMpqhqm-7vY2qnbtSfdd1jItBq5aWtdF3IjUE"; // get from https://dashboard.web3auth.io
+const clientId =
+  "BFPl1lD-zUhMkA1l9moBsaCVWET-tFVkWDyPbUlcTatNTAyhKzfMpqhqm-7vY2qnbtSfdd1jItBq5aWtdF3IjUE"; // get from https://dashboard.web3auth.io
 
 //For Mainnet
 /* chainConfig: {
@@ -29,34 +45,39 @@ function App() {
       },
     })
   );
+  const { isShown, toggle } = useModal();
+  const [data, updateModal] = useState<JSX.Element>(
+    <React.Fragment></React.Fragment>
+  );
 
   const [wallet, setWalletState] = useState<Wallet | null>(null);
 
-  const setCurrentWallet = async (web3AuthProvider: SafeEventEmitterProvider | null) => {
+  const setCurrentWallet = async (
+    web3AuthProvider: SafeEventEmitterProvider | null
+  ) => {
     if (web3AuthProvider === null) {
       setWalletState(null);
       return;
     }
-    const provider = new Web3Provider(web3AuthProvider)
-    const signer = provider.getSigner()
-    const address = (await signer.getAddress()).toLowerCase()
-    const walletConnection = await generateSpecificWalletConnection(signer)
+    const provider = new Web3Provider(web3AuthProvider);
+    const signer = provider.getSigner();
+    const address = (await signer.getAddress()).toLowerCase();
+    const walletConnection = await generateSpecificWalletConnection(signer);
 
     setWalletState({
       signer,
       provider,
       walletConnection,
-      address
+      address,
     });
-
-  }
+  };
 
   useEffect(() => {
     const init = async () => {
       try {
         await web3auth.initModal();
-        if (web3auth.provider) return "No Valid Web3 Provider"
-        await setCurrentWallet(web3auth.provider)
+        if (web3auth.provider) return "No Valid Web3 Provider";
+        await setCurrentWallet(web3auth.provider);
       } catch (error) {
         console.error(error);
       }
@@ -74,7 +95,6 @@ function App() {
     const web3authProvider = await web3auth.connect();
     if (web3authProvider == null) return;
     setCurrentWallet(web3authProvider);
-
   };
 
   //get web3auth user info
@@ -84,7 +104,7 @@ function App() {
       return;
     }
     const user = await web3auth.getUserInfo();
-    console.log(user);
+    showModal(user, updateModal, toggle);
   };
 
   //get Web3auth token details
@@ -94,9 +114,9 @@ function App() {
       return;
     }
     const idToken = await web3auth.authenticateUser();
-    console.log(idToken);
+    showModal(idToken, updateModal, toggle);
   };
-  
+
   //Get IMX ETH balance of wallet
   const checkIMXBalance = async () => {
     if (!wallet) {
@@ -105,7 +125,7 @@ function App() {
     }
     try {
       const balance = await getWalletBalance(wallet);
-      console.log(JSON.stringify(balance, null, 4));
+      showModal(balance, updateModal, toggle);
     } catch (error) {
       throw new Error(JSON.stringify(error, null, 4));
     }
@@ -118,8 +138,8 @@ function App() {
       return;
     }
     try {
-      const result = needToRegister(wallet)
-      console.log(result)
+      const result = needToRegister(wallet);
+      showModal(result, updateModal, toggle);
     } catch (error) {
       throw new Error(JSON.stringify(error, null, 4));
     }
@@ -133,14 +153,19 @@ function App() {
     }
     try {
       //check if target wallet has been registered
-      needToRegister(wallet)
+      needToRegister(wallet);
 
-      const target_wallet = '0xF6372939CE2d14A68A629B8E4785E9dCB4EdA0cf'
-      const token_address_for_sale = '0x7510f4d7bcaa8639c0f21b938662071c2df38c73';
-      const token_id_for_sale = '328';
-      const result = await createERC721Transfer(wallet, token_id_for_sale, token_address_for_sale, target_wallet);
-      console.log(JSON.stringify(result, null, 4));
-
+      const target_wallet = "0xF6372939CE2d14A68A629B8E4785E9dCB4EdA0cf";
+      const token_address_for_sale =
+        "0x7510f4d7bcaa8639c0f21b938662071c2df38c73";
+      const token_id_for_sale = "328";
+      const result = await createERC721Transfer(
+        wallet,
+        token_id_for_sale,
+        token_address_for_sale,
+        target_wallet
+      );
+      showModal(result, updateModal, toggle);
     } catch (error) {
       console.error(error);
     }
@@ -154,10 +179,10 @@ function App() {
     }
     try {
       //make sure wallet is registered before doing something
-      needToRegister(wallet)
+      needToRegister(wallet);
       const order_id_to_buy = 328;
       const result = await buyOrder(wallet, order_id_to_buy);
-      console.log(JSON.stringify(result, null, 4));
+      showModal(result, updateModal, toggle);
     } catch (error) {
       console.error(error);
     }
@@ -171,15 +196,20 @@ function App() {
     }
     try {
       //make sure wallet is registered before doing something
-      needToRegister(wallet)
+      needToRegister(wallet);
 
-      const token_address_for_sale = '0x7510f4d7bcaa8639c0f21b938662071c2df38c73';
-      const token_id_for_sale = '152';
-      //amount is quantized - 
-      const amount_eth_for_sale = '10000000000000000'
-      const result = await sellERC721ForETH(wallet, token_id_for_sale, token_address_for_sale, amount_eth_for_sale);
-      console.log(JSON.stringify(result, null, 4));
-
+      const token_address_for_sale =
+        "0x7510f4d7bcaa8639c0f21b938662071c2df38c73";
+      const token_id_for_sale = "152";
+      //amount is quantized -
+      const amount_eth_for_sale = "10000000000000000";
+      const result = await sellERC721ForETH(
+        wallet,
+        token_id_for_sale,
+        token_address_for_sale,
+        amount_eth_for_sale
+      );
+      showModal(result, updateModal, toggle);
     } catch (error) {
       console.error(error);
     }
@@ -193,8 +223,7 @@ function App() {
     }
     try {
       const balance = await getAssets(wallet.address);
-      console.log(JSON.stringify(balance, null, 4));
-
+      showModal(balance, updateModal, toggle);
     } catch (error) {
       console.error(error);
     }
@@ -208,10 +237,10 @@ function App() {
     }
     try {
       //make sure wallet is registered before doing something
-      needToRegister(wallet)
-      const amount_to_deposit = '100000000000000000'
+      needToRegister(wallet);
+      const amount_to_deposit = "100000000000000000";
       const result = await createETHDeposit(wallet, amount_to_deposit);
-      console.log(JSON.stringify(result, null, 4));
+      showModal(result, updateModal, toggle);
     } catch (error) {
       console.error(error);
     }
@@ -234,7 +263,8 @@ function App() {
       return;
     }
     const chainId = await wallet.provider?.getNetwork();
-    console.log(chainId);
+    showModal(chainId, updateModal, toggle);
+
   };
 
   //get L1 wallet addresses
@@ -244,7 +274,7 @@ function App() {
       return;
     }
     const address = await wallet.provider?.listAccounts();
-    console.log(address);
+    showModal(address, updateModal, toggle);
   };
 
   //get L1 balance of wallet
@@ -254,7 +284,7 @@ function App() {
       return;
     }
     const balance = await wallet.provider?.getBalance(wallet?.address);
-    console.log(balance);
+    showModal(balance, updateModal, toggle);
   };
 
   //sign a specific message using wallet
@@ -267,8 +297,9 @@ function App() {
     const originalMessage = "YOUR_MESSAGE";
 
     // Sign the message
-    const signedMessage = await wallet?.signer.signMessage(originalMessage)
+    const signedMessage = await wallet?.signer.signMessage(originalMessage);
     console.log(signedMessage);
+    showModal(signedMessage, updateModal, toggle);
   };
 
   //get private key if available
@@ -279,13 +310,20 @@ function App() {
     }
     const rpc = new RPC(web3auth.provider);
     const privateKey = await rpc.getPrivateKey();
-    console.log(privateKey);
+    showModal(privateKey, updateModal, toggle);
   };
 
   const loggedInView = (
     <>
+      <div id="modal"></div>
       <button onClick={getUserInfo} className="card">
         Get User Info
+        <Modal
+          isShown={isShown}
+          hide={toggle}
+          modalContent={data}
+          headerText={"Result"}
+        />
       </button>
       <button onClick={getidToken} className="card">
         Get ID Token
@@ -348,24 +386,45 @@ function App() {
         <a target="_blank" href="http://web3auth.io/" rel="noreferrer">
           Web3Auth
         </a>
-        <a target="_blank" href="https://docs.x.immutable.com/" rel="noreferrer">
+        <a
+          target="_blank"
+          href="https://docs.x.immutable.com/"
+          rel="noreferrer"
+        >
           + IMX
         </a>
         <a target="_blank" href="https://reactjs.org/" rel="noreferrer">
-         + ReactJS Example
+          + ReactJS Example
         </a>
-         
       </h1>
 
       <div className="grid">{wallet ? loggedInView : unloggedInView}</div>
 
       <footer className="footer">
-        <a href="https://github.com/samueltan-immutable/web3auth-test" target="_blank" rel="noopener noreferrer">
+        <a
+          href="https://github.com/samueltan-immutable/web3auth-test"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
           Source code
         </a>
       </footer>
     </div>
   );
+}
+
+function showModal(content: any, updateModal: React.Dispatch<React.SetStateAction<JSX.Element>>, toggle: () => void) {
+  const json = JSON.stringify(content, null, 2)
+  console.log(json);
+  const modal = (
+    <React.Fragment>
+      <SyntaxHighlighter language="json" style={github} wrapLongLines={true}>
+        {json}
+      </SyntaxHighlighter>
+    </React.Fragment>
+  );
+  updateModal(modal);
+  toggle();
 }
 
 export default App;

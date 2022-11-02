@@ -4,6 +4,11 @@
   padding: 0 2rem;
 }
 
+pre {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
 .main {
   min-height: 100vh;
   padding: 4rem 0;
