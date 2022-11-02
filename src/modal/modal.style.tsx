@@ -56,7 +56,6 @@ export const CloseButton = styled.button`
 
 export const Content = styled.div`
   padding: 1rem;
-  max-height: 30rem;
   background-color: rgb(248, 248, 248);
   border-radius: 8px 8px;
 `;
